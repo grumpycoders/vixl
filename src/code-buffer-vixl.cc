@@ -24,6 +24,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <stdexcept>
 extern "C" {
 #include <sys/mman.h>
 }
@@ -164,22 +165,7 @@ void CodeBuffer::Reset() {
 
 
 void CodeBuffer::Grow(size_t new_capacity) {
-  VIXL_ASSERT(managed_);
-  VIXL_ASSERT(new_capacity > capacity_);
-  ptrdiff_t cursor_offset = GetCursorOffset();
-#ifdef VIXL_CODE_BUFFER_MALLOC
-  buffer_ = static_cast<byte*>(realloc(buffer_, new_capacity));
-  VIXL_CHECK(buffer_ != NULL);
-#elif defined(VIXL_CODE_BUFFER_MMAP)
-  buffer_ = static_cast<byte*>(
-      mremap(buffer_, capacity_, new_capacity, MREMAP_MAYMOVE));
-  VIXL_CHECK(buffer_ != MAP_FAILED);
-#else
-#error Unknown code buffer allocator.
-#endif
-
-  cursor_ = buffer_ + cursor_offset;
-  capacity_ = new_capacity;
+    throw std::runtime_error("[Vixl] Grow function was called somehow");
 }
 
 
