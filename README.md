@@ -1,3 +1,6 @@
+===========================================
+THIS IS A CUSTOM VERSION OF VIXL FOR PERSONAL USE. USE https://github.com/Linaro/vixl FOR YOUR PROJECTS INSTEAD
+===========================================
 VIXL: ARMv8 Runtime Code Generation Library
 ===========================================
 
