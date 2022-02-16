@@ -380,10 +380,7 @@ uint32_t CPU::GetCacheType() {
   VIXL_ASSERT(IsUint32(cache_type_register));
   return static_cast<uint32_t>(cache_type_register);
 #else
-  // This will lead to a cache with 1 byte long lines, which is fine since
-  // neither EnsureIAndDCacheCoherency nor the simulator will need this
-  // information.
-  return 0;
+    VIXL_UNREACHABLE();
 #endif
 }
 
@@ -501,9 +498,7 @@ void CPU::EnsureIAndDCacheCoherency(void *address, size_t length) {
       :
       : "memory");
 #else
-  // If the host isn't AArch64, we must be using the simulator, so this function
-  // doesn't have to do anything.
-  USE(address, length);
+  VIXL_UNIMPLEMENTED();
 #endif
 }
 
