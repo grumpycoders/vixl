@@ -25,9 +25,21 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdexcept>
-extern "C" {
-#include <sys/mman.h>
-}
+
+#ifdef _WIN32
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <windows.h> // For VirtualAlloc/VirtualProtect
+#else
+    extern "C" {
+    #include <sys/mman.h>
+    }
+#endif
 
 #include "code-buffer-vixl.h"
 #include "utils-vixl.h"
@@ -46,13 +58,17 @@ CodeBuffer::CodeBuffer(size_t capacity)
   }
 #ifdef VIXL_CODE_BUFFER_MALLOC
   buffer_ = reinterpret_cast<byte*>(malloc(capacity_));
-#elif defined(VIXL_CODE_BUFFER_MMAP)
-  buffer_ = reinterpret_cast<byte*>(mmap(NULL,
-                                         capacity,
-                                         PROT_READ | PROT_WRITE,
-                                         MAP_PRIVATE | MAP_ANONYMOUS,
-                                         -1,
-                                         0));
+#elif defined(VIXL_CODE_BUFFER_MMAP) // Use mmap on Linux/BSD/MacOS, VirtualProtect on Windows
+    #ifdef _WIN32
+        buffer = reinterpret_cast<byte*>(VirtualAlloc(nullptr, capacity, MEM_COMMIT, PAGE_READWRITE));
+    #else
+        buffer_ = reinterpret_cast<byte*>(mmap(NULL,
+                                            capacity,
+                                            PROT_READ | PROT_WRITE,
+                                            MAP_PRIVATE | MAP_ANONYMOUS,
+                                            -1,
+                                            0));
+    #endif
 #else
 #error Unknown code buffer allocator.
 #endif
@@ -81,7 +97,11 @@ CodeBuffer::~CodeBuffer() VIXL_NEGATIVE_TESTING_ALLOW_EXCEPTION {
 #ifdef VIXL_CODE_BUFFER_MALLOC
     free(buffer_);
 #elif defined(VIXL_CODE_BUFFER_MMAP)
-    munmap(buffer_, capacity_);
+    #ifdef _WIN32
+        VirtualFree(buffer_, capacity_, MEM_RELEASE);
+    #else
+        munmap(buffer_, capacity_);
+    #endif
 #else
 #error Unknown code buffer allocator.
 #endif
@@ -91,8 +111,14 @@ CodeBuffer::~CodeBuffer() VIXL_NEGATIVE_TESTING_ALLOW_EXCEPTION {
 
 void CodeBuffer::SetExecutable() {
 #ifdef VIXL_CODE_BUFFER_MMAP
-  int ret = mprotect(buffer_, capacity_, PROT_READ | PROT_EXEC);
-  VIXL_CHECK(ret == 0);
+    #ifdef _WIN32
+        DWORD oldProtect; // Unused, but VirtualProtect wants it anyways
+        const auto ret = VirtualProtect(buffer_, capacity_, PAGE_EXECUTE_READ, &oldProtect);
+        VIXL_CHECK(ret != 0);
+    #else
+        int ret = mprotect(buffer_, capacity_, PROT_READ | PROT_EXEC);
+        VIXL_CHECK(ret == 0);
+    #endif
 #else
   // This requires page-aligned memory blocks, which we can only guarantee with
   // mmap.
@@ -103,8 +129,14 @@ void CodeBuffer::SetExecutable() {
 
 void CodeBuffer::SetWritable() {
 #ifdef VIXL_CODE_BUFFER_MMAP
-  int ret = mprotect(buffer_, capacity_, PROT_READ | PROT_WRITE);
-  VIXL_CHECK(ret == 0);
+    #ifdef _WIN32
+        DWORD oldProtect; // Unused, but VirtualProtect wants it anyways
+        const auto ret = VirtualProtect(buffer_, capacity_, PAGE_READWRITE, &oldProtect);
+        VIXL_CHECK(ret != 0);
+    #else
+        int ret = mprotect(buffer_, capacity_, PROT_READ | PROT_WRITE);
+        VIXL_CHECK(ret == 0);
+    #endif
 #else
   // This requires page-aligned memory blocks, which we can only guarantee with
   // mmap.
@@ -115,10 +147,7 @@ void CodeBuffer::SetWritable() {
 
 void CodeBuffer::EmitString(const char* string) {
   VIXL_ASSERT(HasSpaceFor(strlen(string) + 1));
-  char* dst = reinterpret_cast<char*>(cursor_);
-  dirty_ = true;
-  char* null_char = stpcpy(dst, string);
-  cursor_ = reinterpret_cast<byte*>(null_char) + 1;
+  VIXL_UNIMPLEMENTED(); // Old version used stpcpy. Reimplement in a portable manner if necessary.
 }
 
 
